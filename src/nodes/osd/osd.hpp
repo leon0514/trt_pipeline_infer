@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <unordered_map>
 #include <vector>
+#include <chrono>
 
 namespace node
 {
@@ -30,6 +31,8 @@ class OsdNode : public BaseNode
     void osd_tracking(cv::Mat &image, const object::TrackingResultArray &tracking_results);
 
     void osd_fences(cv::Mat &image, const object::FenceArray &fences);
+
+    void osd_time(cv::Mat &image, int64_t& time, int x = 10, int y=10);
 
   private:
     std::unordered_map<int, std::vector<cv::Point>> track_history_;

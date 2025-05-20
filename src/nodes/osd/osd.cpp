@@ -6,6 +6,7 @@
 #include <chrono>
 #include <opencv2/opencv.hpp>
 #include <tuple>
+#include <ctime>
 
 // 日志库
 #include "plog/Initializers/RollingFileInitializer.h"
@@ -293,6 +294,59 @@ void OsdNode::osd_tracking(cv::Mat &image, const object::TrackingResultArray &tr
     }
 }
 
+void OsdNode::osd_time(cv::Mat &image, int64_t& timestamp, int x, int y)
+{
+    if (image.empty()) {
+        return;
+    }
+
+   long long total_milliseconds = timestamp;
+   long long milliseconds_part = total_milliseconds % 1000;
+   std::time_t seconds_since_epoch = static_cast<std::time_t>(total_milliseconds / 1000);
+
+   std::tm* timeinfo_utc;
+   timeinfo_utc = std::gmtime(&seconds_since_epoch);
+
+   if (!timeinfo_utc) {
+       std::string error_msg = "Invalid Timestamp";
+       cv::putText(image, error_msg, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0,0,255), 1, cv::LINE_AA);
+       return;
+   }
+
+   std::ostringstream time_ss;
+   time_ss << (timeinfo_utc->tm_year + 1900) << "-" // tm_year 是自1900年以来的年数
+           << std::setw(2) << std::setfill('0') << (timeinfo_utc->tm_mon + 1) << "-" // tm_mon 是0-11的月份
+           << std::setw(2) << std::setfill('0') << timeinfo_utc->tm_mday << " "
+           << std::setw(2) << std::setfill('0') << timeinfo_utc->tm_hour << ":"
+           << std::setw(2) << std::setfill('0') << timeinfo_utc->tm_min << ":"
+           << std::setw(2) << std::setfill('0') << timeinfo_utc->tm_sec << "."
+           << std::setw(3) << std::setfill('0') << milliseconds_part;
+   std::string time_str = time_ss.str();
+
+    int fontFace = cv::FONT_HERSHEY_SIMPLEX; // 字体类型
+    double fontScale = 0.7;                  // 字体大小
+    cv::Scalar color(0, 255, 0);             // 字体颜色 (BGR格式，这里是绿色)
+    int thickness = 1;                       // 字体粗细
+    int lineType = cv::LINE_AA;              // 线条类型 (抗锯齿)
+
+    int baseline = 0;
+    cv::Size textSize = cv::getTextSize(time_str, fontFace, fontScale, thickness, &baseline);
+    baseline += thickness;
+
+    // 左上角位置 (x, y)，y坐标是基线的位置
+    cv::Point textOrg(x, y + textSize.height);
+
+    // 6. 在图像上绘制文本
+    cv::putText(image,          // 目标图像
+                time_str,       // 要绘制的文本
+                textOrg,        // 文本框的左下角坐标 (cv::putText的org是左下角)
+                fontFace,       // 字体
+                fontScale,      // 字体缩放因子
+                color,          // 文本颜色
+                thickness,      // 文本线条的粗细
+                lineType);      // 线条类型
+}
+
 void OsdNode::handle_data(std::vector<common::FrameDataPtr> &batch_datas)
 {
     auto config_data          = std::dynamic_pointer_cast<common::OsdConfigData>(config_data_);
@@ -327,6 +381,11 @@ void OsdNode::handle_data(std::vector<common::FrameDataPtr> &batch_datas)
             osd_detection(image, frame_data->results);
             osd_fences(image, frame_data->fences);
         }
+        // osd_time(image, frame_data->timestamp, 10, 10);
+        // int64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+        //     std::chrono::system_clock::now().time_since_epoch())
+        //     .count();
+        // osd_time(image, now, 10, 30);
     }
 }
 
