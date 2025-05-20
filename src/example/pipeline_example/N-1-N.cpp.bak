@@ -1,0 +1,123 @@
+#include "common/config.hpp"
+#include "common/data.hpp"
+#include "nodes/base.hpp"
+#include "nodes/infer/infer.hpp"
+#include "nodes/osd/osd.hpp"
+#include "nodes/record/record.hpp"
+#include "nodes/router/router.hpp"
+#include "nodes/stream/stream.hpp"
+#include "nodes/track/track.hpp"
+#include "plog/Initializers/RollingFileInitializer.h"
+#include "plog/Log.h"
+
+void N1N_test()
+{
+    plog::init(plog::info, "log/vsp.log", 1000000, 5);
+
+    std::string pipeline_id_1                   = "1";
+    common::StreamConfigDataPtr stream_config_1 = std::make_shared<common::StreamConfigData>(max_pop_batch_size=1);
+
+    stream_config_1->gpu_id            = 0;
+    stream_config_1->decode_type       = "GPU";
+    stream_config_1->owner_pipeline_id = pipeline_id_1;
+    stream_config_1->skip_frame        = 1;
+    stream_config_1->stream_url        = "rtsp://admin:lww123456@172.16.22.16:554/Streaming/Channels/801";
+    stream_config_1->stream_name       = "test_scr1";
+
+    std::shared_ptr<node::StreamNode> stream_node_1 = std::make_shared<node::StreamNode>("src_1", stream_config_1);
+
+    std::string pipeline_id_2                   = "2";
+    common::StreamConfigDataPtr stream_config_2 = std::make_shared<common::StreamConfigData>(max_pop_batch_size=1);
+
+    stream_config_2->gpu_id            = 0;
+    stream_config_2->decode_type       = "GPU";
+    stream_config_2->owner_pipeline_id = pipeline_id_2;
+    stream_config_2->skip_frame        = 1;
+    stream_config_2->stream_url        = "rtsp://admin:lww123456@172.16.22.16:554/Streaming/Channels/101";
+    stream_config_2->stream_name       = "test_scr2";
+
+    std::shared_ptr<node::StreamNode> stream_node_2 = std::make_shared<node::StreamNode>("src_2", stream_config_2);
+
+    // 创建画图节点
+    common::OsdConfigDataPtr osd_config_1 = std::make_shared<common::OsdConfigData>(max_pop_batch_size=1);
+    osd_config_1->show_final_result       = false;
+    osd_config_1->show_original_result    = true;
+
+    std::shared_ptr<node::OsdNode> osd_node_1 = std::make_shared<node::OsdNode>("osd_1", osd_config_1);
+
+    // 创建画图节点
+    common::OsdConfigDataPtr osd_config_2 = std::make_shared<common::OsdConfigData>(max_pop_batch_size=1);
+    osd_config_2->show_final_result       = false;
+    osd_config_2->show_original_result    = true;
+
+    std::shared_ptr<node::OsdNode> osd_node_2 = std::make_shared<node::OsdNode>("osd_2", osd_config_2);
+
+    // 创建推理节点 公共
+    common::InferConfigDataPtr infer_config     = std::make_shared<common::InferConfigData>(max_pop_batch_size=1);
+    infer_config->model_path                    = "model/engine/yolo11l-seg.transd.engine";
+    infer_config->model_type                    = "YOLO11SEG";
+    infer_config->names_path                    = "model/names/coco.names";
+    infer_config->max_batch_size                = 32;
+    infer_config->gpu_id                        = 0;
+    infer_config->conf_threshold                = 0.4f;
+    infer_config->nms_threshold                 = 0.45f;
+    infer_config->auto_slice                    = false;
+    infer_config->slice_width                   = 1000;
+    infer_config->slice_height                  = 1000;
+    infer_config->slice_horizontal_ratio        = 0.2;
+    infer_config->slice_vertical_ratio          = 0.2;
+    std::shared_ptr<node::InferNode> infer_node = std::make_shared<node::InferNode>("infer", infer_config);
+
+    common::RouterConfigDataPtr router_config    = std::make_shared<common::RouterConfigData>(2);
+    std::shared_ptr<node::RouterNode> route_node = std::make_shared<node::RouterNode>("router", router_config);
+
+    // 创建记录节点1
+    common::RecordConfigDataPtr record_config_1 = std::make_shared<common::RecordConfigData>(1);
+    // record_config_1->gst_pipeline =
+    //     "appsrc ! queue ! videoconvert ! queue ! video/x-raw,format=I420 ! x264enc"
+    //     " bitrate=4000 "
+    //     "tune=zerolatency key-int-max=50 ! queue ! video/x-h264, profile=baseline ! queue ! "
+    //     "mp4mux ! filesink location=result/2.mp4";
+    record_config_1->gst_pipeline =
+        "appsrc ! queue ! videoconvert ! queue ! video/x-raw,format=I420 ! x264enc speed-preset=ultrafast bitrate=4000 "
+        "tune=zerolatency key-int-max=50 ! queue ! video/x-h264,profile=baseline ! queue ! rtspclientsink "
+        "location=rtsp://172.16.20.193:8554/live801";
+
+    std::shared_ptr<node::RecordNode> record_node_1 = std::make_shared<node::RecordNode>("record_1", record_config_1);
+
+    // 创建记录节点2
+    common::RecordConfigDataPtr record_config_2 = std::make_shared<common::RecordConfigData>(1);
+    // record_config_2->gst_pipeline =
+    //     "appsrc ! queue ! videoconvert ! queue ! video/x-raw,format=I420 ! x264enc speed-preset=ultrafast
+    //     bitrate=4000 " "tune=zerolatency key-int-max=50 ! queue ! video/x-h264, profile=baseline ! queue ! " "mp4mux
+    //     ! filesink location=result/2.mp4";
+    record_config_2->gst_pipeline =
+        "appsrc ! queue ! videoconvert ! queue ! video/x-raw,format=I420 ! x264enc speed-preset=ultrafast bitrate=4000 "
+        "tune=zerolatency key-int-max=50 ! queue ! video/x-h264,profile=baseline ! queue ! rtspclientsink "
+        "location=rtsp://172.16.20.193:8554/live101";
+    std::shared_ptr<node::RecordNode> record_node_2 = std::make_shared<node::RecordNode>("record_2", record_config_2);
+
+    // 连接节点
+    node::LinkNode(stream_node_1, infer_node, pipeline_id_1);
+    node::LinkNode(infer_node, route_node, pipeline_id_1);
+    node::LinkNode(route_node, osd_node_1, pipeline_id_1);
+    node::LinkNode(osd_node_1, record_node_1, pipeline_id_1);
+
+    // 连接节点
+    node::LinkNode(stream_node_2, infer_node, pipeline_id_2);
+    node::LinkNode(infer_node, route_node, pipeline_id_2);
+    node::LinkNode(route_node, osd_node_2, pipeline_id_2);
+    node::LinkNode(osd_node_2, record_node_2, pipeline_id_2);
+
+    record_node_1->start();
+    record_node_2->start();
+    osd_node_1->start();
+    osd_node_2->start();
+    route_node->start();
+    infer_node->start();
+    stream_node_1->start();
+    stream_node_2->start();
+    getchar();
+}
+
+int main() { N1N_test(); }
