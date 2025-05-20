@@ -207,7 +207,7 @@ nodes:
       gpu_id: 0
       decode_type: GPU
       skip_frame: 1
-      stream_url: "rtsp://admin:Aa000000@112.111.50.9:7084/Streaming/Channels/1"
+      stream_url: "xxx"
       stream_name: "src1"
       owner_pipeline_id: "1"
   - name: src2
@@ -217,7 +217,7 @@ nodes:
       gpu_id: 0
       decode_type: GPU
       skip_frame: 1
-      stream_url: "rtsp://admin:lww123456@172.16.22.16:554/Streaming/Channels/801"
+      stream_url: "xxx"
       stream_name: "src2"
       owner_pipeline_id: "2"
   - name: pose
