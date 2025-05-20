@@ -151,10 +151,12 @@ make pro
 ### 路由节点
 多个pipeline共享同一个INFER节点后将不同pipeline的数据推送到对应的队列。
 根据路由节点实现多条pipeline共用一个INFER节点, ROUTER节点会将识别后的数据根据pipeline id送入到对应的pipeline
+```
 N --- 1 --- N 结构
 src1 ----->                       -----> osd1 -----> record1
               infer -----> router 
 src2 ----->                       -----> osd2 -----> record2
+```
 
 ---
 
